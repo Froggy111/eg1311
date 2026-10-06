@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 const uint32_t UM_PER_US = 340e6 / 1e6 / 2;
+const uint16_t TIMEOUT = 2e6 / UM_PER_US;
 
 class Ultrasound {
     uint8_t trig;
@@ -20,7 +21,10 @@ class Ultrasound {
         digitalWrite(this->trig, 0);
     }
     uint16_t inline get_pulse_us() {
-        uint16_t pulse = pulseIn(this->echo, HIGH);
+        uint16_t pulse = pulseIn(this->echo, HIGH, TIMEOUT);
+        if (pulse == 0) {
+            pulse = TIMEOUT;
+        }
         return pulse;
     }
     uint16_t inline get_dist_mm() {

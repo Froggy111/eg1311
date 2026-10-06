@@ -26,14 +26,19 @@ enum class State : u8 {
     ApproachingWall,
     ThrowingBall,
     MovingBack,
+    MovingBackRampTransition,
+    MovingBackFinish,
+    Stopped,
 };
 const u16 RAMP_TRANSITION_START = 150;
-const u16 RAMP_TRANSITION_END = 200;
+const u16 RAMP_TRANSITION_END = 500;
 const u16 WALL_THRESHOLD = 75;
 const int FORWARD_DUTY = 255;
 const int BACKWARD_DUTY = -255;
 const u16 LOOP_FREQ = 100;
 const u16 LOOP_DELAY = 1000 / LOOP_FREQ;
+u16 STARTING_US_VAL;
+bool STARTING_US_READ = false;
 
 const float SERVO_SPEED = 60;  // degrees per second
 const u16 DELAY_PER_DEGREE_INCREMENT = 1000.0f / SERVO_SPEED;
@@ -63,10 +68,14 @@ void loop() {
     auto start = millis();
     ultrasound.start_measurement();
     u16 dist = ultrasound.get_dist_mm();
+    if (!STARTING_US_READ) {
+        STARTING_US_VAL = dist;
+        STARTING_US_READ = true;
+    }
 #ifdef DEBUG
     Serial.print("dist(mm): ");
     Serial.print(dist);
-    Serial.print("state: ");
+    Serial.print(", state: ");
 #endif
 
     switch (state) {
@@ -74,7 +83,7 @@ void loop() {
 #ifdef DEBUG
             Serial.println("ApproachingRampStart");
 #endif
-            if (dist < prev_dist && dist < RAMP_TRANSITION_START) {
+            if (dist < RAMP_TRANSITION_START) {
                 state = State::ApproachingRampFinish;
             }
             break;
@@ -130,6 +139,40 @@ void loop() {
 #endif
             motor0.drive(BACKWARD_DUTY);
             motor1.drive(BACKWARD_DUTY);
+            if (dist > RAMP_TRANSITION_END) {
+                state = State::MovingBackRampTransition;
+            }
+            break;
+        }
+        case State::MovingBackRampTransition: {
+#ifdef DEBUG
+            Serial.println("MovingBackRampTransition");
+#endif
+            motor0.drive(BACKWARD_DUTY);
+            motor1.drive(BACKWARD_DUTY);
+            if (dist < RAMP_TRANSITION_START) {
+                state = State::MovingBackFinish;
+            }
+            break;
+        }
+        case State::MovingBackFinish: {
+#ifdef DEBUG
+            Serial.println("MovingBackFinish");
+#endif
+            if (dist >= STARTING_US_VAL) {
+                motor0.drive(0);
+                motor1.drive(0);
+                state = State::Stopped;
+            } else {
+                motor0.drive(BACKWARD_DUTY);
+                motor1.drive(BACKWARD_DUTY);
+            }
+            break;
+        }
+        case State::Stopped: {
+#ifdef DEBUG
+            Serial.println("Stopped");
+#endif
             break;
         }
     };

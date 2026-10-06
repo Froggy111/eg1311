@@ -16,7 +16,7 @@ class Motor {
             analogWrite(p0, drive);
         } else {
             analogWrite(p0, 0);
-            analogWrite(p1, drive);
+            analogWrite(p1, -drive);
         }
     }
 };
