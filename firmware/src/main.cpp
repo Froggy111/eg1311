@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <Servo.h>
 
-#include "HardwareSerial.h"
 #include "motor.hpp"
 #include "ultrasound.hpp"
 
@@ -12,8 +11,8 @@ using u8 = uint8_t;
 namespace pins {
 const u8 MOTOR0_H = 3;
 const u8 MOTOR0_L = 5;
-const u8 MOTOR1_H = 6;
-const u8 MOTOR1_L = 9;
+// const u8 MOTOR1_H = 6;
+// const u8 MOTOR1_L = 9;
 
 const u8 ULTRASOUND_ECHO = 2;
 const u8 ULTRASOUND_TRIG = 8;
@@ -33,12 +32,10 @@ enum class State : u8 {
 const u16 WALL_THRESHOLD = 75;  // need to measure this
 const int FORWARD_DUTY = 128;
 const int BACKWARD_DUTY = -128;
-const u16 LOOP_FREQ = 100;
+const u16 LOOP_FREQ = 10;
 const u16 LOOP_DELAY = 1000 / LOOP_FREQ;
-u16 STARTING_US_VAL;
-bool STARTING_US_READ = false;
-const u16 FORWARD_TIME = 10e3;
-const u16 BACKWARD_TIME = 10e3;
+const u16 FORWARD_TIME = 1e3;
+const u16 BACKWARD_TIME = 1e3;
 
 const float SERVO_SPEED = 60;  // degrees per second
 const u16 DELAY_PER_DEGREE_INCREMENT = 1000.0f / SERVO_SPEED;
@@ -47,36 +44,37 @@ const u8 END_ANGLE = 180;
 
 Servo servo;
 Motor motor0(pins::MOTOR0_H, pins::MOTOR0_L);
-Motor motor1(pins::MOTOR1_H, pins::MOTOR1_L);
+// Motor motor1(pins::MOTOR1_H, pins::MOTOR1_L);
 Ultrasound ultrasound(pins::ULTRASOUND_TRIG, pins::ULTRASOUND_ECHO);
 State state = State::Forward;
 u16 prev_dist = 1000;
 
 void setup() {
     motor0.init();
-    motor1.init();
+    // motor1.init();
     ultrasound.init();
     servo.attach(pins::SERVO_PULSE);
 #ifdef DEBUG
     Serial.begin(115200);
 #endif
     motor0.drive(FORWARD_DUTY);
-    motor1.drive(FORWARD_DUTY);
+    // motor1.drive(FORWARD_DUTY);
 }
 
 unsigned long LAST_START;
 bool LAST_START_INITED = false;
+u16 WALL_US_VAL;
+bool WALL_US_READ = false;
 
 void loop() {
     auto start = millis();
     ultrasound.start_measurement();
     u16 dist = ultrasound.get_dist_mm();
     if (dist == TIMEOUT_MM) {
+#ifdef DEBUG
+        Serial.println("fucked");
+#endif
         return;
-    }
-    if (!STARTING_US_READ) {
-        STARTING_US_VAL = dist;
-        STARTING_US_READ = true;
     }
 #ifdef DEBUG
     Serial.print("dist(mm): ");
@@ -94,23 +92,24 @@ void loop() {
                 LAST_START_INITED = true;
             }
             motor0.drive(FORWARD_DUTY);
-            motor1.drive(FORWARD_DUTY);
+            // motor1.drive(FORWARD_DUTY);
 
-            while (millis() < LAST_START + FORWARD_TIME) {
-#ifdef DEBUG
-                Serial.println("Forward");
-#endif  // DEBUG
-            };
-            state = State::Wall;
+            if (!(millis() < LAST_START + FORWARD_TIME)) {
+                state = State::Wall;
+            }
             break;
         }
         case State::Wall: {
 #ifdef DEBUG
             Serial.println("Wall");
 #endif
+            if (!WALL_US_READ) {
+                WALL_US_VAL = dist;
+                WALL_US_READ = true;
+            }
             if (dist <= WALL_THRESHOLD) {
                 motor0.drive(0);
-                motor1.drive(0);
+                // motor1.drive(0);
                 state = State::Throwing;
             }
             break;
@@ -136,7 +135,7 @@ void loop() {
                 }
             }
             motor0.drive(BACKWARD_DUTY);
-            motor1.drive(BACKWARD_DUTY);
+            // motor1.drive(BACKWARD_DUTY);
             state = State::WallBack;
             break;
         }
@@ -144,7 +143,7 @@ void loop() {
 #ifdef DEBUG
             Serial.println("WallBack");
 #endif
-            if (dist >= WALL_THRESHOLD) {
+            if (dist >= WALL_US_VAL) {
                 LAST_START = start;
                 state = State::Back;
             }
@@ -154,14 +153,11 @@ void loop() {
 #ifdef DEBUG
             Serial.println("Back");
 #endif
-            while (millis() < LAST_START + BACKWARD_TIME) {
-#ifdef DEBUG
-                Serial.println("Back");
-#endif
+            if (!(millis() < LAST_START + BACKWARD_TIME)) {
+                motor0.drive(0);
+                // motor1.drive(0);
+                state = State::Stopped;
             };
-            motor0.drive(0);
-            motor1.drive(0);
-            state = State::Stopped;
             break;
         }
         case State::Stopped: {
