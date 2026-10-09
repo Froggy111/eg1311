@@ -71,6 +71,9 @@ void loop() {
     auto start = millis();
     ultrasound.start_measurement();
     u16 dist = ultrasound.get_dist_mm();
+    if (dist == TIMEOUT_MM) {
+        return;
+    }
     if (!STARTING_US_READ) {
         STARTING_US_VAL = dist;
         STARTING_US_READ = true;
@@ -94,6 +97,9 @@ void loop() {
             motor1.drive(FORWARD_DUTY);
 
             while (millis() < LAST_START + FORWARD_TIME) {
+#ifdef DEBUG
+                Serial.println("Forward");
+#endif  // DEBUG
             };
             state = State::Wall;
             break;
@@ -135,6 +141,9 @@ void loop() {
             break;
         }
         case State::WallBack: {
+#ifdef DEBUG
+            Serial.println("WallBack");
+#endif
             if (dist >= WALL_THRESHOLD) {
                 LAST_START = start;
                 state = State::Back;
@@ -142,7 +151,13 @@ void loop() {
             break;
         }
         case State::Back: {
+#ifdef DEBUG
+            Serial.println("Back");
+#endif
             while (millis() < LAST_START + BACKWARD_TIME) {
+#ifdef DEBUG
+                Serial.println("Back");
+#endif
             };
             motor0.drive(0);
             motor1.drive(0);
@@ -150,6 +165,9 @@ void loop() {
             break;
         }
         case State::Stopped: {
+#ifdef DEBUG
+            Serial.println("Stopped");
+#endif
             break;
         }
     }

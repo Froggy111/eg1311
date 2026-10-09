@@ -2,6 +2,7 @@
 
 const uint32_t UM_PER_US = 340e6 / 1e6 / 2;
 const uint16_t TIMEOUT = 2e6 / UM_PER_US;
+const uint16_t TIMEOUT_MM = (TIMEOUT * UM_PER_US) / 1000;
 
 class Ultrasound {
     uint8_t trig;
