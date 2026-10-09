@@ -1,10 +1,11 @@
 #include <Arduino.h>
 #include <Servo.h>
 
+#include "HardwareSerial.h"
 #include "motor.hpp"
 #include "ultrasound.hpp"
 
-// #define DEBUG
+#define DEBUG
 
 using u8 = uint8_t;
 
@@ -21,24 +22,23 @@ const u8 SERVO_PULSE = 4;
 }  // namespace pins
 
 enum class State : u8 {
-    ApproachingRampStart,
-    ApproachingRampFinish,
-    ApproachingWall,
-    ThrowingBall,
-    MovingBack,
-    MovingBackRampTransition,
-    MovingBackFinish,
+    Forward,
+    Wall,
+    Throwing,
+    WallBack,
+    Back,
     Stopped,
 };
-const u16 RAMP_TRANSITION_START = 150;
-const u16 RAMP_TRANSITION_END = 500;
-const u16 WALL_THRESHOLD = 75;
-const int FORWARD_DUTY = 255;
-const int BACKWARD_DUTY = -255;
+
+const u16 WALL_THRESHOLD = 75;  // need to measure this
+const int FORWARD_DUTY = 128;
+const int BACKWARD_DUTY = -128;
 const u16 LOOP_FREQ = 100;
 const u16 LOOP_DELAY = 1000 / LOOP_FREQ;
 u16 STARTING_US_VAL;
 bool STARTING_US_READ = false;
+const u16 FORWARD_TIME = 10e3;
+const u16 BACKWARD_TIME = 10e3;
 
 const float SERVO_SPEED = 60;  // degrees per second
 const u16 DELAY_PER_DEGREE_INCREMENT = 1000.0f / SERVO_SPEED;
@@ -49,7 +49,7 @@ Servo servo;
 Motor motor0(pins::MOTOR0_H, pins::MOTOR0_L);
 Motor motor1(pins::MOTOR1_H, pins::MOTOR1_L);
 Ultrasound ultrasound(pins::ULTRASOUND_TRIG, pins::ULTRASOUND_ECHO);
-State state = State::ApproachingRampStart;
+State state = State::Forward;
 u16 prev_dist = 1000;
 
 void setup() {
@@ -63,6 +63,9 @@ void setup() {
     motor0.drive(FORWARD_DUTY);
     motor1.drive(FORWARD_DUTY);
 }
+
+unsigned long LAST_START;
+bool LAST_START_INITED = false;
 
 void loop() {
     auto start = millis();
@@ -79,38 +82,34 @@ void loop() {
 #endif
 
     switch (state) {
-        case State::ApproachingRampStart: {
+        case State::Forward: {
 #ifdef DEBUG
-            Serial.println("ApproachingRampStart");
-#endif
-            if (dist < RAMP_TRANSITION_START) {
-                state = State::ApproachingRampFinish;
+            Serial.println("Forward");
+#endif  // DEBUG
+            if (!LAST_START_INITED) {
+                LAST_START = start;
+                LAST_START_INITED = true;
             }
+            motor0.drive(FORWARD_DUTY);
+            motor1.drive(FORWARD_DUTY);
+
+            while (millis() < LAST_START + FORWARD_TIME) {
+            };
+            state = State::Wall;
             break;
         }
-        case State::ApproachingRampFinish: {
+        case State::Wall: {
 #ifdef DEBUG
-            Serial.println("ApproachingRampFinish");
+            Serial.println("Wall");
 #endif
-            if (dist > RAMP_TRANSITION_END) {
-                state = State::ApproachingWall;
-            }
-            break;
-        }
-        case State::ApproachingWall: {
-#ifdef DEBUG
-            Serial.println("ApproachingWall");
-#endif
-            // can do some better ramping here maybe
-            // but simply stopping should be fine
             if (dist <= WALL_THRESHOLD) {
                 motor0.drive(0);
                 motor1.drive(0);
-                state = State::ThrowingBall;
+                state = State::Throwing;
             }
             break;
         }
-        case State::ThrowingBall: {
+        case State::Throwing: {
 #ifdef DEBUG
             Serial.println("ThrowingBall");
 #endif
@@ -130,52 +129,30 @@ void loop() {
                 while (millis() < (start + DELAY_PER_DEGREE_INCREMENT)) {
                 }
             }
-            state = State::MovingBack;
-            break;
-        }
-        case State::MovingBack: {
-#ifdef DEBUG
-            Serial.println("MovingBack");
-#endif
             motor0.drive(BACKWARD_DUTY);
             motor1.drive(BACKWARD_DUTY);
-            if (dist > RAMP_TRANSITION_END) {
-                state = State::MovingBackRampTransition;
+            state = State::WallBack;
+            break;
+        }
+        case State::WallBack: {
+            if (dist >= WALL_THRESHOLD) {
+                LAST_START = start;
+                state = State::Back;
             }
             break;
         }
-        case State::MovingBackRampTransition: {
-#ifdef DEBUG
-            Serial.println("MovingBackRampTransition");
-#endif
-            motor0.drive(BACKWARD_DUTY);
-            motor1.drive(BACKWARD_DUTY);
-            if (dist < RAMP_TRANSITION_START) {
-                state = State::MovingBackFinish;
-            }
-            break;
-        }
-        case State::MovingBackFinish: {
-#ifdef DEBUG
-            Serial.println("MovingBackFinish");
-#endif
-            if (dist >= STARTING_US_VAL) {
-                motor0.drive(0);
-                motor1.drive(0);
-                state = State::Stopped;
-            } else {
-                motor0.drive(BACKWARD_DUTY);
-                motor1.drive(BACKWARD_DUTY);
-            }
+        case State::Back: {
+            while (millis() < LAST_START + BACKWARD_TIME) {
+            };
+            motor0.drive(0);
+            motor1.drive(0);
+            state = State::Stopped;
             break;
         }
         case State::Stopped: {
-#ifdef DEBUG
-            Serial.println("Stopped");
-#endif
             break;
         }
-    };
+    }
 
     prev_dist = dist;
     while (millis() < (start + LOOP_DELAY)) {
