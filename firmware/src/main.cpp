@@ -29,25 +29,25 @@ enum class State : u8 {
     Stopped,
 };
 
-const u16 WALL_THRESHOLD = 75;  // need to measure this
-const int FORWARD_DUTY = 128;
-const int BACKWARD_DUTY = -128;
-const u16 LOOP_FREQ = 10;
+const u16 WALL_THRESHOLD = 125;  // need to measure this
+const int FORWARD_DUTY = 255;
+const int BACKWARD_DUTY = -255;
+const u16 LOOP_FREQ = 20;
 const u16 LOOP_DELAY = 1000 / LOOP_FREQ;
-const u16 FORWARD_TIME = 1e3;
-const u16 BACKWARD_TIME = 1e3;
+const u16 FORWARD_TIME = 3.5e3;
+const u16 BACKWARD_TIME = 3.5e3;
+const u16 SAFETY_BACKWARD = 0.8e3;
 
-const float SERVO_SPEED = 60;  // degrees per second
+const float SERVO_SPEED = 270;  // degrees per second
 const u16 DELAY_PER_DEGREE_INCREMENT = 1000.0f / SERVO_SPEED;
 const u8 START_ANGLE = 0;
-const u8 END_ANGLE = 180;
+const u8 END_ANGLE = 145;
 
 Servo servo;
 Motor motor0(pins::MOTOR0_H, pins::MOTOR0_L);
 // Motor motor1(pins::MOTOR1_H, pins::MOTOR1_L);
 Ultrasound ultrasound(pins::ULTRASOUND_TRIG, pins::ULTRASOUND_ECHO);
 State state = State::Forward;
-u16 prev_dist = 1000;
 
 void setup() {
     motor0.init();
@@ -68,25 +68,13 @@ bool WALL_US_READ = false;
 
 void loop() {
     auto start = millis();
-    ultrasound.start_measurement();
-    u16 dist = ultrasound.get_dist_mm();
-    if (dist == TIMEOUT_MM) {
-#ifdef DEBUG
-        Serial.println("fucked");
-#endif
-        return;
-    }
-#ifdef DEBUG
-    Serial.print("dist(mm): ");
-    Serial.print(dist);
-    Serial.print(", state: ");
-#endif
 
     switch (state) {
         case State::Forward: {
 #ifdef DEBUG
             Serial.println("Forward");
 #endif  // DEBUG
+            servo.write(0);
             if (!LAST_START_INITED) {
                 LAST_START = start;
                 LAST_START_INITED = true;
@@ -102,6 +90,13 @@ void loop() {
         case State::Wall: {
 #ifdef DEBUG
             Serial.println("Wall");
+#endif
+            ultrasound.start_measurement();
+            u16 dist = ultrasound.get_dist_mm();
+#ifdef DEBUG
+            Serial.print("dist(mm): ");
+            Serial.print(dist);
+            Serial.print(", state: ");
 #endif
             if (!WALL_US_READ) {
                 WALL_US_VAL = dist;
@@ -137,13 +132,21 @@ void loop() {
             motor0.drive(BACKWARD_DUTY);
             // motor1.drive(BACKWARD_DUTY);
             state = State::WallBack;
+            LAST_START = start;
             break;
         }
         case State::WallBack: {
 #ifdef DEBUG
             Serial.println("WallBack");
 #endif
-            if (dist >= WALL_US_VAL) {
+            ultrasound.start_measurement();
+            u16 dist = ultrasound.get_dist_mm();
+#ifdef DEBUG
+            Serial.print("dist(mm): ");
+            Serial.print(dist);
+            Serial.print(", state: ");
+#endif
+            if (dist >= WALL_US_VAL || millis() >= (start + SAFETY_BACKWARD)) {
                 LAST_START = start;
                 state = State::Back;
             }
@@ -168,7 +171,6 @@ void loop() {
         }
     }
 
-    prev_dist = dist;
     while (millis() < (start + LOOP_DELAY)) {
     }
 }

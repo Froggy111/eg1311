@@ -18,7 +18,7 @@ class Ultrasound {
     }
     void inline start_measurement() {
         digitalWrite(this->trig, 1);
-        delayMicroseconds(10);
+        delayMicroseconds(20);
         digitalWrite(this->trig, 0);
     }
     uint16_t inline get_pulse_us() {
