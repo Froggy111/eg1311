@@ -54,11 +54,13 @@ void setup() {
     // motor1.init();
     ultrasound.init();
     servo.attach(pins::SERVO_PULSE);
+    servo.write(0);
 #ifdef DEBUG
     Serial.begin(115200);
 #endif
-    motor0.drive(FORWARD_DUTY);
+    motor0.drive(0);
     // motor1.drive(FORWARD_DUTY);
+    delay(2000);
 }
 
 unsigned long LAST_START;
