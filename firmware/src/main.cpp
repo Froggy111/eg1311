@@ -11,8 +11,6 @@ using u8 = uint8_t;
 namespace pins {
 const u8 MOTOR0_H = 3;
 const u8 MOTOR0_L = 5;
-// const u8 MOTOR1_H = 6;
-// const u8 MOTOR1_L = 9;
 
 const u8 ULTRASOUND_ECHO = 2;
 const u8 ULTRASOUND_TRIG = 8;
@@ -44,22 +42,19 @@ const u8 START_ANGLE = 0;
 const u8 END_ANGLE = 110;
 
 Servo servo;
-Motor motor0(pins::MOTOR0_H, pins::MOTOR0_L);
-// Motor motor1(pins::MOTOR1_H, pins::MOTOR1_L);
+Motor motor(pins::MOTOR0_H, pins::MOTOR0_L);
 Ultrasound ultrasound(pins::ULTRASOUND_TRIG, pins::ULTRASOUND_ECHO);
 State state = State::Forward;
 
 void setup() {
-    motor0.init();
-    // motor1.init();
+    motor.init();
     ultrasound.init();
     servo.attach(pins::SERVO_PULSE);
     servo.write(0);
 #ifdef DEBUG
     Serial.begin(115200);
 #endif
-    motor0.drive(0);
-    // motor1.drive(FORWARD_DUTY);
+    motor.drive(0);
     delay(2000);
 }
 
@@ -81,8 +76,7 @@ void loop() {
                 LAST_START = start;
                 LAST_START_INITED = true;
             }
-            motor0.drive(FORWARD_DUTY);
-            // motor1.drive(FORWARD_DUTY);
+            motor.drive(FORWARD_DUTY);
 
             if (!(millis() < LAST_START + FORWARD_TIME)) {
                 state = State::Wall;
@@ -105,8 +99,7 @@ void loop() {
                 WALL_US_READ = true;
             }
             if (dist <= WALL_THRESHOLD) {
-                motor0.drive(0);
-                // motor1.drive(0);
+                motor.drive(0);
                 state = State::Throwing;
             }
             break;
@@ -131,8 +124,7 @@ void loop() {
                 while (millis() < (start + DELAY_PER_DEGREE_INCREMENT)) {
                 }
             }
-            motor0.drive(BACKWARD_DUTY);
-            // motor1.drive(BACKWARD_DUTY);
+            motor.drive(BACKWARD_DUTY);
             state = State::WallBack;
             LAST_START = start;
             break;
@@ -159,8 +151,7 @@ void loop() {
             Serial.println("Back");
 #endif
             if (!(millis() < LAST_START + BACKWARD_TIME)) {
-                motor0.drive(0);
-                // motor1.drive(0);
+                motor.drive(0);
                 state = State::Stopped;
             };
             break;
