@@ -46,6 +46,11 @@ Motor motor(pins::MOTOR0_H, pins::MOTOR0_L);
 Ultrasound ultrasound(pins::ULTRASOUND_TRIG, pins::ULTRASOUND_ECHO);
 State state = State::Forward;
 
+unsigned long LAST_START;
+bool LAST_START_INITED = false;
+u16 WALL_US_VAL;
+bool WALL_US_READ = false;
+
 void setup() {
     motor.init();
     ultrasound.init();
@@ -57,11 +62,6 @@ void setup() {
     motor.drive(0);
     delay(2000);
 }
-
-unsigned long LAST_START;
-bool LAST_START_INITED = false;
-u16 WALL_US_VAL;
-bool WALL_US_READ = false;
 
 void loop() {
     auto start = millis();
