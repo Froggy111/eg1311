@@ -35,13 +35,13 @@ const int BACKWARD_DUTY = -255;
 const u16 LOOP_FREQ = 20;
 const u16 LOOP_DELAY = 1000 / LOOP_FREQ;
 const u16 FORWARD_TIME = 3.5e3;
-const u16 BACKWARD_TIME = 3.5e3;
-const u16 SAFETY_BACKWARD = 0.8e3;
+const u16 BACKWARD_TIME = 3.2e3;
+const u16 SAFETY_BACKWARD = 0.4e3;
 
 const float SERVO_SPEED = 270;  // degrees per second
 const u16 DELAY_PER_DEGREE_INCREMENT = 1000.0f / SERVO_SPEED;
 const u8 START_ANGLE = 0;
-const u8 END_ANGLE = 145;
+const u8 END_ANGLE = 110;
 
 Servo servo;
 Motor motor0(pins::MOTOR0_H, pins::MOTOR0_L);
